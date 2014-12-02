@@ -2,7 +2,7 @@ noinst_LIBRARIES	= libx8664.a
 
 SUFFIXES = .asm
 
-libx8664_a_SOURCES	= sha256_xmm_amd64.asm sha256_sse4_amd64.asm
+libx8664_a_SOURCES	= sha256_xmm_amd64.asm sha256_sse4_amd64.asm sha256_sse4_amd64_peon.asm
 
 .asm.o:
 	$(YASM) -f $(YASM_FMT) -o $@ $<

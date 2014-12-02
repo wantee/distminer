@@ -401,6 +401,9 @@ BFG_DRIVER(cpumining,CPU mining,,no,[
 ])
 driverlist=`echo "${driverlist}" | sed -e 's/ cpumining/ cpu/'`
 
+BFG_DRIVER(distmining,DIST mining,,no,[
+])
+
 BFG_DRIVER(,OpenCL,,no)
 
 m4_define([BFG_PTHREAD_FLAG_CHECK],

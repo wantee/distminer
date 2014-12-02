@@ -9,6 +9,7 @@ minerd
 minerd.exe
 *.o
 *.bin
+peon
 
 autom4te.cache
 .deps
@@ -67,3 +68,6 @@ core*
 *.zip
 *.tbz2
 *.bz2
+
+.dirstamp
+cscope.*

@@ -41,6 +41,10 @@ INCLUDES	= -fno-strict-aliasing
 
 bin_PROGRAMS	= bfgminer
 
+if USE_DISTMINING
+bin_PROGRAMS += peon
+peon_SOURCES := peon.c peon_utils.h peon_utils.c task.h task.c
+endif # USE_DISTMINING
 sbin_SCRIPTS =
 
 if HAVE_WINDOWS
@@ -81,7 +85,7 @@ bfgminer_SOURCES += miner.h compat.h  \
 	deviceapi.c deviceapi.h \
 		   util.c util.h logging.h		\
 		   sha2.c sha2.h api.c
-EXTRA_bfgminer_DEPENDENCIES =
+#EXTRA_bfgminer_DEPENDENCIES =
 
 TESTS = test-bfgminer.sh
 EXTRA_DIST += test-bfgminer.sh
@@ -99,7 +103,7 @@ bfgminer_SOURCES += version.c version.h
 BUILT_SOURCES = version.h
 
 SUBDIRS += $(libbase58_SUBDIRS) $(libblkmaker_SUBDIRS)
-EXTRA_bfgminer_DEPENDENCIES += $(libbase58_EXTRADEPS) $(libblkmaker_EXTRADEPS)
+#EXTRA_bfgminer_DEPENDENCIES += $(libbase58_EXTRADEPS) $(libblkmaker_EXTRADEPS)
 @BUNDLED_LIB_RULES@
 
 bfgminer_SOURCES	+= logging.c
@@ -202,6 +206,28 @@ endif
 endif # HAVE_x86_64
 endif # HAS_YASM
 endif # USE_CPUMINING
+
+if USE_DISTMINING
+peon_SOURCES	+= sha256_sse4_amd64_peon.h sha256_sse4_amd64_peon.c
+
+if HAS_YASM
+
+AM_CFLAGS	= -DHAS_YASM
+if HAVE_x86_64
+SUBDIRS		+= x86_64
+x86_64/libx8664.a:
+	$(MAKE) -C x86_64 $*
+peon_LDADD	= x86_64/libx8664.a
+else # HAVE_x86_64
+SUBDIRS		+= x86_32
+x86_32/libx8632.a:
+	$(MAKE) -C x86_32 $*
+peon_LDADD	= x86_32/libx8632.a
+
+endif # HAVE_x86_64
+endif # HAS_YASM
+endif # USE_DISTMINING
+
 endif # USE_SHA256D
 
 if USE_SCRYPT
@@ -220,6 +246,11 @@ if USE_CPUMINING
 dist_doc_DATA += README.CPU
 bfgminer_SOURCES += driver-cpu.h driver-cpu.c
 endif # USE_CPUMINING
+
+if USE_DISTMINING
+dist_doc_DATA += README.DIST
+bfgminer_SOURCES += driver-dist.h driver-dist.c
+endif # USE_DISTMINING
 
 if NEED_BFG_LOWL_VCOM
 bfgminer_SOURCES += lowl-vcom.c lowl-vcom.h

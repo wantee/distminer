@@ -1,0 +1,69 @@
+Dist Miner 0.0.1
+=====================
+
+A Distributed Bitcoin Miner based on bfgminer
+
+Architecture
+---------------------
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    {                                               }
+    {            bitcoind(solo mining)              }
+    {                    or                         }
+    {           pool server(pool minig)             }
+    {                                               }
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                |                       ^
+                |                       |
+         miner_get_work()       miner_submit_work()
+                |                       |
+                |                       |
+                v                       |
+     -----------------------------------------------
+    |                     Miner                     |
+    |                                               |
+    |                   <<WORK>>                    |
+    |                      |                        |
+    |                miner_gen_task()               |
+    |              ________|_________               |
+    |             |        |         |              |
+    |             v        v         v              |
+    |          <TASK1>    ***     <TASKn>           |
+     -----------------------------------------------
+                  ^         ^        ^
+                  |         |        |
+                     miner_put_task()
+                  |         |        |
+                  |         |        |
+                  v         v        v
+     ----------------------------------------------
+    |                                              |
+    |                Scheduler(Storm)              |
+    |                                              |
+     ----------------------------------------------
+                  ^         ^         ^
+                  |         |         |
+               <TASK1>     ***     <TASKn>
+                  |         |         |
+                  v         v         v
+                ------    ------    ------
+               | Peon |  | Peon |  | Peon |
+                ------    ------    ------
+
+
+
+There are three main roles in the system:
+
+* Miner: responsible for communicating with the Bitcoin network and split WORK to TASks;
+* Peon: responsible for doing the specific TASK, notify the miner when it found something worthful;
+* Scheduler: responsible for assigning TASKs to Peons, currently we use Storm.
+
+
+Build
+---------------------
+    ./configure --disable-other-drivers --enable-distmining --prefix=/home/wangjian-it/tools/distminer
+
+
+Deploy
+--------------------
+See *doc/deploy.md*
+

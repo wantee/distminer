@@ -4,21 +4,25 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "config.h"
+#include "miner.h"
+
+#define MAX_ENC_LEN 2048
 
 typedef struct _task_t_ {
-	unsigned char	data[128];
-	unsigned char	hash1[64];
-	unsigned char	midstate[32];
-	unsigned char	target[32];
-	unsigned char	hash[32];
+    int id;
+    struct thr_info *thr;
+    struct work *work;
 
-    uint32_t nonce;
-    uint32_t max_nonce;
+    uint32_t first_nonce;
+    uint32_t last_nonce;
+
+    char enc_str[MAX_ENC_LEN];
+    size_t enc_str_len;
+    size_t enc_str_pos;
 } task_t;
 
-int task_write(task_t *task, FILE *fp);
-int task_read(task_t *task, FILE *fp);
+int task_enc(task_t *task);
+int task_dec(task_t *task);
 
 #endif 
 

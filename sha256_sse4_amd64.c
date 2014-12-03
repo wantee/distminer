@@ -12,6 +12,7 @@
 #include "config.h"
 
 #include "driver-cpu.h"
+#include "driver-dist.h"
 
 #ifdef WANT_X8664_SSE4
 
@@ -125,11 +126,13 @@ bool scanhash_sse4_64(struct thr_info * const thr, struct work * const work,
 		}
 	}
 
+/*
         if (unlikely((nonce >= max_nonce) || thr->work_restart))
         {
 			*last_nonce = nonce;
 			return false;
 	}
+*/
 
 	nonce += 4;
    }

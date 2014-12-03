@@ -44,6 +44,10 @@ bin_PROGRAMS	= bfgminer
 if USE_DISTMINING
 bin_PROGRAMS += peon
 peon_SOURCES := peon.c peon_utils.h peon_utils.c task.h task.c
+
+peon_LDADD    = $(libbase58_LIBS)   $(libblkmaker_LIBS)
+peon_CPPFLAGS = $(libbase58_CFLAGS) $(libblkmaker_CFLAGS)
+peon_LDFLAGS = $(PTHREAD_FLAGS)
 endif # USE_DISTMINING
 sbin_SCRIPTS =
 
@@ -208,7 +212,7 @@ endif # HAS_YASM
 endif # USE_CPUMINING
 
 if USE_DISTMINING
-peon_SOURCES	+= sha256_sse4_amd64_peon.h sha256_sse4_amd64_peon.c
+peon_SOURCES	+= sha256_sse4_amd64.c
 
 if HAS_YASM
 
@@ -217,12 +221,12 @@ if HAVE_x86_64
 SUBDIRS		+= x86_64
 x86_64/libx8664.a:
 	$(MAKE) -C x86_64 $*
-peon_LDADD	= x86_64/libx8664.a
+peon_LDADD	+= x86_64/libx8664.a
 else # HAVE_x86_64
 SUBDIRS		+= x86_32
 x86_32/libx8632.a:
 	$(MAKE) -C x86_32 $*
-peon_LDADD	= x86_32/libx8632.a
+peon_LDADD	+= x86_32/libx8632.a
 
 endif # HAVE_x86_64
 endif # HAS_YASM
@@ -249,7 +253,7 @@ endif # USE_CPUMINING
 
 if USE_DISTMINING
 dist_doc_DATA += README.DIST
-bfgminer_SOURCES += driver-dist.h driver-dist.c
+bfgminer_SOURCES += driver-dist.h driver-dist.c task.h task.c
 endif # USE_DISTMINING
 
 if NEED_BFG_LOWL_VCOM

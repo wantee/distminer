@@ -1002,6 +1002,10 @@ extern bool opt_restart;
 extern char *opt_icarus_options;
 extern char *opt_icarus_timing;
 extern bool opt_worktime;
+#if USE_DISTMINING
+extern int opt_task_num;
+extern char *opt_storm_url;
+#endif
 #ifdef USE_AVALON
 extern char *opt_avalon_options;
 #endif

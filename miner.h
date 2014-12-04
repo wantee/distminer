@@ -1005,6 +1005,7 @@ extern bool opt_worktime;
 #if USE_DISTMINING
 extern int opt_task_num;
 extern char *opt_storm_url;
+extern int opt_task_tmo;
 #endif
 #ifdef USE_AVALON
 extern char *opt_avalon_options;

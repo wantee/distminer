@@ -19,8 +19,15 @@ typedef struct _task_t_ {
     char enc_str[MAX_ENC_LEN];
     size_t enc_str_len;
     size_t enc_str_pos;
+
+    bool found;
+    uint32_t found_nonce;
+    char read_buf[MAX_ENC_LEN];
+    size_t read_buf_len;
+    size_t read_buf_pos;
 } task_t;
 
+void task_clear(task_t *task);
 int task_enc(task_t *task);
 int task_dec(task_t *task);
 

@@ -250,6 +250,7 @@ char *cgminer_path;
 #if defined(USE_DISTMINING)
 int opt_task_num;
 char *opt_storm_url;
+int opt_task_tmo;
 #endif
 
 #if defined(USE_BITFORCE)
@@ -2802,11 +2803,14 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--pools",
 			opt_set_bool, NULL, NULL, opt_hidden),
 #if defined(USE_DISTMINING)
-	OPT_WITHOUT_ARG("--task-num",
-			set_int_1_to_65535, &opt_task_num,
+	OPT_WITH_ARG("--task-num",
+			set_int_1_to_65535, NULL, &opt_task_num,
 			"number of tasks spliting one work into"),
-	OPT_WITHOUT_ARG("--storm-url", set_strdup, &opt_storm_url,
-			"URL of Storm DRPC"),
+	OPT_WITH_ARG("--task-timeout",
+			set_int_0_to_9999, NULL, &opt_task_tmo,
+			"timeout for one task"),
+	OPT_WITH_ARG("--storm-url", set_strdup, NULL, &opt_storm_url,
+             "URL of Storm DRPC"),
 #endif
 	OPT_ENDTABLE
 };

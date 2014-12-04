@@ -8,10 +8,6 @@
 #include "peon_utils.h"
 #include "task.h"
 
-#define PEON_LOG(fmt, ...) \
-    fprintf(stderr, "[%s:%d<<%s>>] " fmt "\n", __FILE__, __LINE__, __func__, \
-    ##__VA_ARGS__);
-
 void show_usage(char *module_name)
 {
     printf("\n");
@@ -32,6 +28,7 @@ const uint32_t hash1_init[] = {
 extern bool scanhash_sse4_64(struct thr_info *, struct work *, uint32_t max_nonce, uint32_t *last_nonce, uint32_t nonce);
 
 static char g_data_id[2048];
+static bool g_found = false;
 
 static uint64_t peon_scanhash(task_t *task)
 {
@@ -53,11 +50,11 @@ static uint64_t peon_scanhash(task_t *task)
 
     /* if nonce found, submit task */
     if (unlikely(rc)) {
-        PEON_LOG("Found something?");
-        printf("%s\toutput\tdrpc\t\t%u\n", g_data_id, *(uint32_t*)&task->work->data[76]);
+        g_found = true;
+
+        fprintf(stdout, "%s\toutput\tdrpc\t\tF%u\n", g_data_id, *(uint32_t*)&task->work->data[76]);
         fflush(stdout);
-    } else if (unlikely(last_nonce == first_nonce)) {
-        return 0;
+        STDERR_LOG("%s\toutput\tdrpc\t\tF%u\n", g_data_id, *(uint32_t*)&task->work->data[76]);
     }
 
     return last_nonce - first_nonce + 1;
@@ -65,11 +62,14 @@ static uint64_t peon_scanhash(task_t *task)
 
 int main(int argc, char *argv[])
 {
+    char line[2048];
+    struct work work;
     task_t task;
     uint64_t hashes;
     char *ptr;
     int c = 0;
 
+    task.work = &work;
     signal(SIGPIPE, SIG_IGN);
 
     while ((c = getopt(argc, argv, "hv")) != -1) {
@@ -82,24 +82,43 @@ int main(int argc, char *argv[])
         }
     }
 
-    while(fgets(task.enc_str, MAX_ENC_LEN, stdin)) {
-        ptr = strrchr(task.enc_str, '\n');
+    while(fgets(line, 2048, stdin)) {
+        ptr = strrchr(line, '\n');
         if (ptr != NULL) {
             *ptr = 0;
         }
 
+        ptr = strchr(line, '\t');
+        if (ptr == NULL) {
+            fprintf(stdout, "%s\tack\n", line);
+            fflush(stdout);
+            continue;
+        }
+
+        *ptr = 0;
+        strncpy(g_data_id, line, 2048);
+        g_data_id[2047] = 0;
+
+        ptr++;
+        strncpy(task.enc_str, ptr, MAX_ENC_LEN);
+        task.enc_str[MAX_ENC_LEN - 1] = 0;
+
         if (task_dec(&task) < 0) {
-            PEON_LOG("Failed to task_dec.");
-            return -1;
+            STDERR_LOG("Failed to task_dec. str[%s]", task.enc_str);
+            fprintf(stdout, "%s\tack\n", g_data_id);
+            fflush(stdout);
+            continue;
         }
 
+        g_found = false;
         hashes = peon_scanhash(&task);
-        if (hashes == 0) {
-            PEON_LOG("Failed to peon_scanhash.");
-            return -1;
+        if (g_found == false) {
+            fprintf(stdout, "%s\toutput\tdrpc\t\tN\n", g_data_id);
+            fflush(stdout);
         }
 
-        PEON_LOG("Hashes Done: %lu", hashes);
+        STDERR_LOG("Hashes Done: %lu, Found: %s(%u)", hashes, g_found ? "YES" : "NO", 
+                g_found ? *(uint32_t*)&task.work->data[76] : 0);
     }
 
     return 0;

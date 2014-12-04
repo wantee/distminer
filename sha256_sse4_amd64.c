@@ -55,19 +55,19 @@ bool scanhash_sse4_64(struct thr_info * const thr, struct work * const work,
 	uint32_t max_nonce, uint32_t *last_nonce,
 	uint32_t nonce)
 {
-	const uint8_t * const pmidstate = work->midstate;
-	uint8_t *pdata = work->data;
-	const uint32_t * const phash1 = hash1_init;
-	uint8_t * const phash = work->hash;
-	
-	uint32_t *hash32 = (uint32_t *)phash;
+    const uint8_t * const pmidstate = work->midstate;
+    uint8_t *pdata = work->data;
+    const uint32_t * const phash1 = hash1_init;
+    uint8_t * const phash = work->hash;
+
+    uint32_t *hash32 = (uint32_t *)phash;
     uint32_t *nNonce_p = (uint32_t *)(pdata + 76);
     uint32_t m_midstate[8], m_w[16], m_w1[16];
     __m128i m_4w[64], m_4hash[64], m_4hash1[64];
     __m128i offset;
     int i;
 
-	pdata += 64;
+    pdata += 64;
 
     /* For debugging */
     union {
@@ -89,53 +89,51 @@ bool scanhash_sse4_64(struct thr_info * const thr, struct work * const work,
         m_4hash1[i] = _mm_set1_epi32(m_w1[i]);
 
     for (i = 0; i < 64; i++)
-	g_4sha256_k[i] = _mm_set1_epi32(g_sha256_k[i]);
+        g_4sha256_k[i] = _mm_set1_epi32(g_sha256_k[i]);
 
     offset = _mm_set_epi32(0x3, 0x2, 0x1, 0x0);
 
     for (;;)
     {
-	int j;
+        int j;
 
-	m_4w[3] = _mm_add_epi32(offset, _mm_set1_epi32(nonce));
+        m_4w[3] = _mm_add_epi32(offset, _mm_set1_epi32(nonce));
 
-	/* Some optimization can be done here W.R.T. precalculating some hash */
+        /* Some optimization can be done here W.R.T. precalculating some hash */
         CalcSha256_x64_sse4(m_4hash1, m_4w, m_midstate);
-	CalcSha256_x64_sse4(m_4hash, m_4hash1, g_sha256_hinit);
+        CalcSha256_x64_sse4(m_4hash, m_4hash1, g_sha256_hinit);
 
-	for (j = 0; j < 4; j++) {
-	    mi.m = m_4hash[7];
-	    if (unlikely(mi.i[j] == 0))
-		break;
+        for (j = 0; j < 4; j++) {
+            mi.m = m_4hash[7];
+            if (unlikely(mi.i[j] == 0))
+                break;
         }
 
-	/* If j = true, we found a hit...so check it */
-	/* Use the C version for a check... */
-	if (unlikely(j != 4)) {
-		for (i = 0; i < 8; i++) {
-		    mi.m = m_4hash[i];
-		    *(uint32_t *)&(phash)[i*4] = mi.i[j];
-		}
+        /* If j = true, we found a hit...so check it */
+        /* Use the C version for a check... */
+        if (unlikely(j != 4)) {
+            for (i = 0; i < 8; i++) {
+                mi.m = m_4hash[i];
+                *(uint32_t *)&(phash)[i*4] = mi.i[j];
+            }
 
-		if (unlikely(hash32[7] == 0))
-		{
-			nonce += j;
-			*last_nonce = nonce;
-			*nNonce_p = nonce;
-			return true;
-		}
-	}
+            if (unlikely(hash32[7] == 0))
+            {
+                nonce += j;
+                *last_nonce = nonce;
+                *nNonce_p = nonce;
+                return true;
+            }
+        }
 
-/*
-        if (unlikely((nonce >= max_nonce) || thr->work_restart))
+        if (unlikely((nonce >= max_nonce)))// || thr->work_restart))
         {
-			*last_nonce = nonce;
-			return false;
-	}
-*/
+            *last_nonce = nonce;
+            return false;
+        }
 
-	nonce += 4;
-   }
+        nonce += 4;
+    }
 }
 
 #endif /* WANT_X8664_SSE4 */

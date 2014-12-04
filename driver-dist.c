@@ -99,11 +99,6 @@ static bool dist_thread_prepare(struct thr_info *thr)
 	return true;
 }
 
-static uint64_t dist_can_limit_work(struct thr_info __maybe_unused *thr)
-{
-	return 0xffff;
-}
-
 static bool dist_thread_init(struct thr_info *thr)
 {
 	return true;
@@ -118,14 +113,40 @@ float dist_min_nonce_diff(struct cgpu_info * const proc, const struct mining_alg
 static size_t recv_nonce_cb(const void *ptr, size_t size, size_t nmemb,
 			  void *user_data)
 {
+    char *str;
+    size_t len;
     int i;
-    uint32_t *nonce = user_data;
+    task_t *task = (task_t*) user_data;
 
-    sscanf((char *)ptr, "%*s\toutput\tdrpc\t\t%u\n", nonce);
+    if (nmemb >= task->read_buf_len - task->read_buf_pos) {
+        applog(LOG_ERR, "task read buffer overflow");
+        return nmemb;
+    }
+
+    len = nmemb;
+    str = (char*)ptr;
+    if (task->read_buf_pos == 0) {
+        if (*str == 'F') {
+            task->found = true;
+        }
+        str++;
+        len--;
+    }
+
+    applog(LOG_ERR, "FOUND:[%d]", task->found);
+    if (task->found == false) {
+        return nmemb;
+    }
+
+    if (len > 0) {
+        memcpy(task->read_buf + task->read_buf_pos, str, len);
+        task->read_buf_pos += len;
+    }
 
 	return nmemb;
 }
 
+#if 0
 static size_t send_task_cb(void *ptr, size_t size, size_t nmemb,
 			     void *user_data)
 {
@@ -147,6 +168,7 @@ static size_t send_task_cb(void *ptr, size_t size, size_t nmemb,
 
 	return len;
 }
+#endif
 
 static 
 void *task_thread(void *args)
@@ -159,9 +181,10 @@ void *task_thread(void *args)
     task = (task_t *)args;
 
     if (task_enc(task) < 0) {
-        applog(LOG_ERR, "curl_easy_init() failed");
+        applog(LOG_ERR, "task_enc() failed");
         return NULL;
     }
+    applog(LOG_DEBUG, "TASK[%d/%d]: %u-%u", task->work->id, task->id, task->first_nonce, task->last_nonce);
 
     curl = curl_easy_init();
     if(curl == NULL) {
@@ -171,18 +194,26 @@ void *task_thread(void *args)
 
     curl_easy_setopt(curl, CURLOPT_URL, opt_storm_url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, recv_nonce_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &nonce);
-    curl_easy_setopt(curl, CURLOPT_READFUNCTION, send_task_cb);
-    curl_easy_setopt(curl, CURLOPT_READDATA, task);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, task);
+    //curl_easy_setopt(curl, CURLOPT_READFUNCTION, send_task_cb);
+    //curl_easy_setopt(curl, CURLOPT_READDATA, task);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, task->enc_str);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(task->enc_str));
+    //curl_easy_setopt(curl, CURLOPT_TIMEOUT, opt_task_tmo);
+    //curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1); // fix bug *** longjmp causes uninitialized stack frame ***
 
     res = curl_easy_perform(curl);
     if(res != CURLE_OK) {
         applog(LOG_ERR, "curl_easy_perform() failed: %s",
                 curl_easy_strerror(res));
     } else {
-        /* if nonce found, submit work */
-        applog(LOG_DEBUG, "%"PRIpreprv" found something?", task->thr->cgpu->proc_repr);
-        submit_nonce(task->thr, task->work, le32toh(*(uint32_t*)&nonce));
+        if (task->found == true) {
+            sscanf(task->read_buf, "%u\n", &nonce);
+
+            /* if nonce found, submit work */
+            applog(LOG_DEBUG, "%"PRIpreprv" found something?", task->thr->cgpu->proc_repr);
+            submit_nonce(task->thr, task->work, le32toh(*(uint32_t*)&nonce));
+        }
     }
 
     curl_easy_cleanup(curl);
@@ -199,6 +230,8 @@ static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t ma
     first_nonce = work->blk.nonce;
     step = (max_nonce - first_nonce) / opt_task_num;
     for (i = 0; i < opt_task_num; i++) {
+        task_clear(g_tasks + i);
+
         g_tasks[i].work = work;
         g_tasks[i].thr = thr;
         g_tasks[i].first_nonce = first_nonce + i*step;
@@ -221,12 +254,11 @@ static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t ma
 
 struct device_drv dist_drv = {
 	.dname = "dist",
-	.name = "DIST",
+	.name = "DST",
 	.probe_priority = 120,
 	.drv_min_nonce_diff = dist_min_nonce_diff,
 	.drv_detect = dist_detect,
 	.thread_prepare = dist_thread_prepare,
-	.can_limit_work = dist_can_limit_work,
 	.thread_init = dist_thread_init,
 	.scanhash = dist_scanhash,
 };

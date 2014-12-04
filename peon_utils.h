@@ -64,4 +64,7 @@
 
 bool fulltest(const unsigned char *hash, const unsigned char *target);
 
+#define STDERR_LOG(fmt, ...) \
+    fprintf(stderr, "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); fflush(stderr);
+
 #endif 

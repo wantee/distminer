@@ -1004,6 +1004,7 @@ extern char *opt_icarus_timing;
 extern bool opt_worktime;
 #if USE_DISTMINING
 extern int opt_task_num;
+extern uint32_t opt_task_hash;
 extern char *opt_storm_url;
 extern int opt_task_tmo;
 #endif

@@ -271,7 +271,8 @@ void minerloop_scanhash(struct thr_info *mythr)
 			thread_reportin(mythr);
 			
 			timersub(&tv_end, &tv_start, &tv_hashes);
-			if (!hashes_done(mythr, hashes, &tv_hashes, api->can_limit_work ? &max_nonce : NULL))
+			//if (!hashes_done(mythr, hashes, &tv_hashes, api->can_limit_work ? &max_nonce : NULL))
+			if (!hashes_done(mythr, hashes, &tv_hashes, NULL))
 				goto disabled;
 			
 			if (unlikely(mythr->work_restart)) {

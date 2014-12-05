@@ -104,6 +104,16 @@ static bool dist_thread_init(struct thr_info *thr)
 	return true;
 }
 
+static uint64_t dist_can_limit_work(struct thr_info __maybe_unused *thr)
+{
+	//return 0xffff;
+    if (opt_task_hash == 0) {
+        return 0xffffffff;
+    } else {
+        return opt_task_num * opt_task_hash;
+    }
+}
+
 static
 float dist_min_nonce_diff(struct cgpu_info * const proc, const struct mining_algorithm * const malgo)
 {
@@ -133,7 +143,6 @@ static size_t recv_nonce_cb(const void *ptr, size_t size, size_t nmemb,
         len--;
     }
 
-    applog(LOG_ERR, "FOUND:[%d]", task->found);
     if (task->found == false) {
         return nmemb;
     }
@@ -223,12 +232,14 @@ void *task_thread(void *args)
 
 static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t max_nonce)
 {
-    int i;
+    uint32_t i;
     uint32_t first_nonce;
     uint32_t step;
 
     first_nonce = work->blk.nonce;
     step = (max_nonce - first_nonce) / opt_task_num;
+    applog(LOG_DEBUG, "Hash: %u-%u, total: %u, step: %u", first_nonce, max_nonce, 
+            max_nonce - first_nonce, step);
     for (i = 0; i < opt_task_num; i++) {
         task_clear(g_tasks + i);
 
@@ -261,4 +272,5 @@ struct device_drv dist_drv = {
 	.thread_prepare = dist_thread_prepare,
 	.thread_init = dist_thread_init,
 	.scanhash = dist_scanhash,
+	.can_limit_work = dist_can_limit_work,
 };

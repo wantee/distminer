@@ -249,6 +249,7 @@ char *cgminer_path;
 
 #if defined(USE_DISTMINING)
 int opt_task_num;
+uint32_t opt_task_hash;
 char *opt_storm_url;
 int opt_task_tmo;
 #endif
@@ -2806,6 +2807,9 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--task-num",
 			set_int_1_to_65535, NULL, &opt_task_num,
 			"number of tasks spliting one work into"),
+	OPT_WITH_ARG("--task-hash",
+			opt_set_intval, NULL, &opt_task_hash,
+			"number of hashs per one task, 0 means unlimited, def. 0"),
 	OPT_WITH_ARG("--task-timeout",
 			set_int_0_to_9999, NULL, &opt_task_tmo,
 			"timeout for one task"),

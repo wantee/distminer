@@ -54,6 +54,8 @@ static uint64_t peon_scanhash(task_t *task)
 
         fprintf(stdout, "%s\toutput\tdrpc\t\tF%u\n", g_data_id, *(uint32_t*)&task->work->data[76]);
         fflush(stdout);
+        fprintf(stdout, "%s\tack\n", g_data_id);
+        fflush(stdout);
         STDERR_LOG("%s\toutput\tdrpc\t\tF%u\n", g_data_id, *(uint32_t*)&task->work->data[76]);
     }
 
@@ -65,6 +67,10 @@ int main(int argc, char *argv[])
     char line[2048];
     struct work work;
     task_t task;
+    struct timeval tts;
+    struct timeval tte;
+    struct timeval tv_elapsed;
+    double secs;
     uint64_t hashes;
     char *ptr;
     int c = 0;
@@ -111,13 +117,22 @@ int main(int argc, char *argv[])
         }
 
         g_found = false;
+        gettimeofday(&tts, NULL);
         hashes = peon_scanhash(&task);
         if (g_found == false) {
             fprintf(stdout, "%s\toutput\tdrpc\t\tN\n", g_data_id);
             fflush(stdout);
+            fprintf(stdout, "%s\tack\n", g_data_id);
+            fflush(stdout);
         }
+        gettimeofday(&tte, NULL);
 
-        STDERR_LOG("Hashes Done: %lu, Found: %s(%u)", hashes, g_found ? "YES" : "NO", 
+        timersub(&tte, &tts, &tv_elapsed);
+	    secs = (double)tv_elapsed.tv_sec + ((double)tv_elapsed.tv_usec / 1000000.0);
+
+        STDERR_LOG("Hashes Done: %"PRIu64", %.1f khash/sec. Found: %s(%u)", hashes, 
+                hashes / 1000 / secs,
+                g_found ? "YES" : "NO", 
                 g_found ? *(uint32_t*)&task.work->data[76] : 0);
     }
 

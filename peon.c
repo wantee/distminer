@@ -130,8 +130,8 @@ int main(int argc, char *argv[])
         timersub(&tte, &tts, &tv_elapsed);
 	    secs = (double)tv_elapsed.tv_sec + ((double)tv_elapsed.tv_usec / 1000000.0);
 
-        STDERR_LOG("Hashes Done: %"PRIu64", %.1f khash/sec. Found: %s(%u)", hashes, 
-                hashes / 1000 / secs,
+        STDERR_LOG("Hashes Done: %"PRIu64", %.1f khash/sec. Time: %.3fs, Found: %s(%u)", hashes, 
+                hashes / 1000 / secs, secs, 
                 g_found ? "YES" : "NO", 
                 g_found ? *(uint32_t*)&task.work->data[76] : 0);
     }

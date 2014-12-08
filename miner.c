@@ -252,6 +252,7 @@ int opt_task_num;
 uint32_t opt_task_hash;
 char *opt_storm_url;
 int opt_task_tmo;
+char *opt_curl_verbose;
 #endif
 
 #if defined(USE_BITFORCE)
@@ -2815,6 +2816,8 @@ static struct opt_table opt_config_table[] = {
 			"timeout for one task"),
 	OPT_WITH_ARG("--storm-url", set_strdup, NULL, &opt_storm_url,
              "URL of Storm DRPC"),
+	OPT_WITH_ARG("--curl-verbose", set_strdup, NULL, &opt_curl_verbose,
+             "Log file for curl verbose"),
 #endif
 	OPT_ENDTABLE
 };

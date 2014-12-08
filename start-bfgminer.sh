@@ -1,5 +1,5 @@
 #!/bin/sh
-BFGMINER_OPTS="-S dist:auto -o http://api.bitcoin.cz:8332 -u sysfamily -p qihoo360sys --storm-url http://drpc1v.safe.zzbc.qihoo.net:3775/drpc/DistMiner --task-num 100 --task-timeout 2"
+BFGMINER_OPTS="-S dist:auto -o http://api.bitcoin.cz:8332 -u xxxx -p xxxx --storm-url http://drpc1v.safe.zzbc.qihoo.net:3775/drpc/DistMiner --task-num 100 --task-hash 3000000"
 n="
 "
 startscreen() {

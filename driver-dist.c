@@ -47,8 +47,8 @@ BFG_REGISTER_DRIVER(dist_drv)
 
 pthread_t *g_tids;
 task_t *g_tasks;
-int g_found_work_id;
-pthread_mutex_t g_found_work_id_lock;
+CURL **g_curls;
+FILE **g_curl_v_fp;
 
 static int dist_autodetect()
 {
@@ -80,6 +80,9 @@ static void dist_detect()
 
 static bool dist_thread_prepare(struct thr_info *thr)
 {
+    char file[2048];
+    int i;
+
     g_tids = (pthread_t *)malloc(sizeof(pthread_t) * opt_task_num);
     if (g_tids == NULL) {
         applog(LOG_ERR, "Failed to malloc pthread_t.");
@@ -92,7 +95,34 @@ static bool dist_thread_prepare(struct thr_info *thr)
         return false;
     }
 
-    pthread_mutex_init(&g_found_work_id_lock, NULL);
+    g_curls = (CURL **)malloc(sizeof(CURL *) * (opt_task_num));
+    if (g_curls == NULL) {
+        applog(LOG_ERR, "Failed to malloc g_curls.");
+        return false;
+    }
+
+    g_curl_v_fp = (FILE **)malloc(sizeof(FILE *) * (opt_task_num));
+    if (g_curl_v_fp == NULL) {
+        applog(LOG_ERR, "Failed to malloc curl_v_fp.");
+        return false;
+    }
+    memset(g_curl_v_fp, 0, sizeof(FILE *) * opt_task_num);
+
+    for (i = 0; i < opt_task_num; i++) {
+        g_curls[i] = curl_easy_init();
+        if(g_curls[i] == NULL) {
+            applog(LOG_ERR, "curl_easy_init() failed");
+            return false;
+        }
+
+        if (opt_curl_verbose != NULL && opt_curl_verbose[0] != 0) {
+            snprintf(file, 2048, "%s.%d", opt_curl_verbose, i);
+            g_curl_v_fp[i] = fopen(file, "w");
+            if (g_curl_v_fp[i] == NULL) {
+                applog(LOG_WARNING, "Failed to open curl verbose file[%s]", file);
+            }
+        }
+    }
 
 	thread_reportin(thr);
 
@@ -186,6 +216,10 @@ void *task_thread(void *args)
     CURLcode res;
     task_t *task;
     uint32_t nonce;
+    struct timeval tts;
+    struct timeval tte;
+    struct timeval tv_elapsed;
+    double secs;
 
     task = (task_t *)args;
 
@@ -193,13 +227,10 @@ void *task_thread(void *args)
         applog(LOG_ERR, "task_enc() failed");
         return NULL;
     }
-    applog(LOG_DEBUG, "TASK[%d/%d]: %u-%u", task->work->id, task->id, task->first_nonce, task->last_nonce);
+    //applog(LOG_DEBUG, "TASK[%d/%d]: %u-%u", task->work->id, task->id, task->first_nonce, task->last_nonce);
 
-    curl = curl_easy_init();
-    if(curl == NULL) {
-        applog(LOG_ERR, "curl_easy_init() failed");
-        return NULL;
-    }
+    curl = task->curl;
+    curl_easy_reset(curl);
 
     curl_easy_setopt(curl, CURLOPT_URL, opt_storm_url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, recv_nonce_cb);
@@ -211,7 +242,19 @@ void *task_thread(void *args)
     //curl_easy_setopt(curl, CURLOPT_TIMEOUT, opt_task_tmo);
     //curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1); // fix bug *** longjmp causes uninitialized stack frame ***
 
+    if (task->curl_v_fp != NULL) {
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+        curl_easy_setopt(curl, CURLOPT_STDERR, task->curl_v_fp);
+    }
+
+    applog(LOG_DEBUG, "Task: [%d/%d], CURL start.", task->work->id, task->id);
+    gettimeofday(&tts, NULL);
     res = curl_easy_perform(curl);
+    gettimeofday(&tte, NULL);
+    timersub(&tte, &tts, &tv_elapsed);
+    secs = (double)tv_elapsed.tv_sec + ((double)tv_elapsed.tv_usec / 1000000.0);
+    applog(LOG_DEBUG, "Task: [%d/%d], CURL time: %.3f", task->work->id, task->id, secs);
+
     if(res != CURLE_OK) {
         applog(LOG_ERR, "curl_easy_perform() failed: %s",
                 curl_easy_strerror(res));
@@ -225,8 +268,6 @@ void *task_thread(void *args)
         }
     }
 
-    curl_easy_cleanup(curl);
-
     return NULL;
 }
 
@@ -238,8 +279,8 @@ static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t ma
 
     first_nonce = work->blk.nonce;
     step = (max_nonce - first_nonce) / opt_task_num;
-    applog(LOG_DEBUG, "Hash: %u-%u, total: %u, step: %u", first_nonce, max_nonce, 
-            max_nonce - first_nonce, step);
+    //applog(LOG_DEBUG, "Hash: %u-%u, total: %u, step: %u", first_nonce, max_nonce, 
+    //        max_nonce - first_nonce, step);
     for (i = 0; i < opt_task_num; i++) {
         task_clear(g_tasks + i);
 
@@ -248,6 +289,8 @@ static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t ma
         g_tasks[i].first_nonce = first_nonce + i*step;
         g_tasks[i].last_nonce = first_nonce + (i + 1) * step - 1;
         g_tasks[i].id = i;
+        g_tasks[i].curl = g_curls[i];
+        g_tasks[i].curl_v_fp = g_curl_v_fp[i];
 
         if (unlikely(pthread_create(g_tids + i, NULL, task_thread, (void *)(g_tasks + i)))) {
             applog(LOG_ERR, "Failed to create task thread");

@@ -25,6 +25,9 @@ typedef struct _task_t_ {
     char read_buf[MAX_ENC_LEN];
     size_t read_buf_len;
     size_t read_buf_pos;
+
+    CURL *curl;
+    FILE *curl_v_fp;
 } task_t;
 
 void task_clear(task_t *task);

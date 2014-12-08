@@ -1007,6 +1007,7 @@ extern int opt_task_num;
 extern uint32_t opt_task_hash;
 extern char *opt_storm_url;
 extern int opt_task_tmo;
+extern char *opt_curl_verbose;
 #endif
 #ifdef USE_AVALON
 extern char *opt_avalon_options;

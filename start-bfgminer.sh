@@ -24,4 +24,4 @@ WHICHPROG="$(which "$PROG" 2>/dev/null)"
 if test -f "$MYDIR/$PROG" && test "$(readlink -e "$WHICHPROG" 2>/dev/null)" != "$(readlink -e "$MYDIR/$PROG")"; then
 	PROG="cd $(readlink -e "$MYDIR")$n./$PROG"
 fi
-startscreen miner "${PROG} ${BFGMINER_OPTS}"
+startscreen distminer "${PROG} ${BFGMINER_OPTS}"

@@ -60,8 +60,11 @@ There are three main roles in the system:
 
 Build
 ---------------------
-    ./configure --disable-other-drivers --enable-distmining --prefix=/home/wangjian-it/tools/distminer
 
+    ./autogen.sh 
+    ./configure --disable-other-drivers --enable-distmining --prefix=$PREFIX
+    make 
+    make install
 
 Deploy
 --------------------

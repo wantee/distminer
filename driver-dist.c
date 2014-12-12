@@ -182,6 +182,18 @@ static size_t recv_nonce_cb(const void *ptr, size_t size, size_t nmemb,
         task->read_buf_pos += len;
     }
 
+#ifdef _MULTI_CURL_
+    if (task->found == true) {
+        uint32_t nonce;
+
+        sscanf(task->read_buf, "%u\n", &nonce);
+
+        /* if nonce found, submit work */
+        applog(LOG_DEBUG, "%"PRIpreprv" found something?", task->thr->cgpu->proc_repr);
+        submit_nonce(task->thr, task->work, le32toh(*(uint32_t*)&nonce));
+    }
+#endif
+
 	return nmemb;
 }
 
@@ -209,8 +221,170 @@ static size_t send_task_cb(void *ptr, size_t size, size_t nmemb,
 }
 #endif
 
-static 
-void *task_thread(void *args)
+#ifdef _MULTI_CURL_
+static int task_setup(task_t *task)
+{
+    CURL *curl;
+    uint32_t nonce;
+    double secs;
+
+    if (task_enc(task) < 0) {
+        applog(LOG_ERR, "task_enc() failed");
+        return -1;
+    }
+    //applog(LOG_DEBUG, "TASK[%d/%d]: %u-%u", task->work->id, task->id, task->first_nonce, task->last_nonce);
+
+    curl = task->curl;
+    curl_easy_reset(curl);
+
+    curl_easy_setopt(curl, CURLOPT_URL, opt_storm_url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, recv_nonce_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, task);
+    //curl_easy_setopt(curl, CURLOPT_READFUNCTION, send_task_cb);
+    //curl_easy_setopt(curl, CURLOPT_READDATA, task);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, task->enc_str);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(task->enc_str));
+    //curl_easy_setopt(curl, CURLOPT_TIMEOUT, opt_task_tmo);
+    //curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1); // fix bug *** longjmp causes uninitialized stack frame ***
+
+    if (task->curl_v_fp != NULL) {
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+        curl_easy_setopt(curl, CURLOPT_STDERR, task->curl_v_fp);
+    }
+
+    return 0;
+}
+
+static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t max_nonce)
+{
+    CURLM *curlm;
+    CURLMcode curlm_code;
+    uint32_t i;
+    uint32_t first_nonce;
+    uint32_t step;
+    int running = 0;
+
+    struct timeval tts;
+    struct timeval tte;
+    struct timeval tv;
+    double spend_time;
+    bool failed;
+
+    curlm = curl_multi_init();
+    if (unlikely(curlm == NULL)) {
+        applog(LOG_ERR, "Failed to create curlm");
+        return -1;
+    }
+
+    first_nonce = work->blk.nonce;
+    step = (max_nonce - first_nonce) / opt_task_num;
+    //applog(LOG_DEBUG, "Hash: %u-%u, total: %u, step: %u", first_nonce, max_nonce, 
+    //        max_nonce - first_nonce, step);
+    for (i = 0; i < opt_task_num; i++) {
+        task_clear(g_tasks + i);
+
+        g_tasks[i].work = work;
+        g_tasks[i].thr = thr;
+        g_tasks[i].first_nonce = first_nonce + i*step;
+        g_tasks[i].last_nonce = first_nonce + (i + 1) * step - 1;
+        g_tasks[i].id = i;
+        g_tasks[i].curl = g_curls[i];
+        g_tasks[i].curl_v_fp = g_curl_v_fp[i];
+
+        if (unlikely(task_setup(g_tasks + i) < 0)) {
+            applog(LOG_ERR, "Failed to setup task[%d/%d]", work->id, i);
+            continue;
+        }
+
+        curlm_code = curl_multi_add_handle(curlm, g_curls[i]);
+        if (curlm_code != CURLM_OK) {
+            applog(LOG_ERR, "TASK[%d/%d]: Failed to curl_multi_add_handle[%d/%s]", 
+                    work->id, i, curlm_code, curl_multi_strerror(curlm_code));
+            continue;
+        }
+    }
+
+    do {
+        curlm_code = curl_multi_perform(curlm, &running);
+    } while (CURLM_CALL_MULTI_PERFORM == curlm_code);
+
+    if (curlm_code != CURLM_OK) {
+        applog(LOG_ERR, "WORK[%d]: curl_multi_perform error[%d/%s]", 
+                work->id,
+                curlm_code, curl_multi_strerror(curlm_code));
+        return -1;
+    }
+
+    gettimeofday(&tts, NULL);
+    applog(LOG_DEBUG, "WORK[%d]: multi perform start", work->id);
+    tv.tv_sec = 4;
+    tv.tv_usec = 0;
+    failed = false;
+    while (running > 0 && !failed) {
+        int rc = -1;
+        fd_set fdread;
+        fd_set fdwrite;
+        fd_set fdexcep;
+        int maxfd = -1;
+
+        FD_ZERO(&fdread);
+        FD_ZERO(&fdwrite);
+        FD_ZERO(&fdexcep);
+
+        curl_multi_fdset(curlm, &fdread, &fdwrite, &fdexcep, &maxfd); 
+        rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &tv); 
+        switch(rc) {
+            case -1:
+                failed = true;
+                break;
+            case 0:
+                failed = true;
+                break;
+            default:
+                while (1) {
+                    int ret = curl_multi_perform(curlm, &running);
+                    if (ret != CURLM_CALL_MULTI_PERFORM) {
+                        break;
+                    }
+                }
+                
+                break;
+        }
+
+        gettimeofday(&tte, NULL);
+        spend_time = (tte.tv_sec - tts.tv_sec) + ((double)(tte.tv_usec - tts.tv_usec))/1000000.0;
+        if (opt_task_tmo > 0 && spend_time > opt_task_tmo) {
+            applog(LOG_ERR, "multi perform timeout, spend_time:%ds", spend_time);
+            goto ERR;
+        }
+    } 
+    applog(LOG_DEBUG, "WORK[%d]: multi perform time: %.3fs", work->id, spend_time);
+
+    if (curlm != NULL) {
+        for (i = 0; i < opt_task_num; i++) {
+            curl_multi_remove_handle(curlm, g_curls[i]);
+        }
+
+        curl_multi_cleanup(curlm);
+    }
+
+	work->blk.nonce = max_nonce + 1;
+	return max_nonce - first_nonce + 1;
+
+ERR:
+    if (curlm != NULL) {
+        for (i = 0; i < opt_task_num; i++) {
+            curl_multi_remove_handle(curlm, g_curls[i]);
+        }
+
+        curl_multi_cleanup(curlm);
+    }
+
+    return -1;
+}
+
+#else 
+static void *task_thread(void *args)
 {
     CURL *curl;
     CURLcode res;
@@ -305,6 +479,7 @@ static int64_t dist_scanhash(struct thr_info *thr, struct work *work, int64_t ma
 	work->blk.nonce = max_nonce + 1;
 	return max_nonce - first_nonce + 1;
 }
+#endif
 
 struct device_drv dist_drv = {
 	.dname = "dist",

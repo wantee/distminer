@@ -59,7 +59,7 @@ endif
 # first, our own stuff
 bfgminer_LDADD    = lib/libgnu.a ccan.bfg/libccan.a
 bfgminer_LDFLAGS  =
-bfgminer_CPPFLAGS = -I$(top_builddir)/lib -I$(top_srcdir)/lib -I$(top_srcdir)/ccan-upstream
+bfgminer_CPPFLAGS = -I$(top_builddir)/lib -I$(top_srcdir)/lib -I$(top_srcdir)/ccan-upstream -D_MULTI_CURL_
 
 # second, potentially embedded libs
 bfgminer_LDADD    += $(libbase58_LIBS)   $(libblkmaker_LIBS)
